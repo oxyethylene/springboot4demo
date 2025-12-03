@@ -1,10 +1,9 @@
 package com.github.oxyethylene.springboot4demo.controller;
 
+import com.github.oxyethylene.springboot4demo.common.strategy.StrategyDispatcher;
 import com.github.oxyethylene.springboot4demo.entity.Affiliate;
 import com.github.oxyethylene.springboot4demo.entity.request.CreateAffiliateRequest;
 import com.github.oxyethylene.springboot4demo.enums.PlatformType;
-import com.github.oxyethylene.springboot4demo.service.AffiliateCreationStrategy;
-import com.github.oxyethylene.springboot4demo.service.AffiliateCreationStrategyFactory;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -17,18 +16,18 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class AffiliateController {
 
-    private final AffiliateCreationStrategyFactory strategyFactory;
+    private final StrategyDispatcher dispatcher;
 
+    /**
+     * Create affiliate using annotation-based strategy routing.
+     * No need to manually get strategy - dispatcher handles it automatically!
+     */
     @PostMapping("/create")
     public ResponseEntity<Affiliate> createAffiliate(@RequestBody CreateAffiliateRequest request) {
-        // Determine platform type from request
         PlatformType platformType = PlatformType.fromId(request.getPlatformId());
 
-        // Get the appropriate strategy
-        AffiliateCreationStrategy strategy = strategyFactory.getStrategy(platformType);
-
-        // Execute platform-specific creation logic
-        Affiliate affiliate = strategy.createAffiliate(request);
+        // Dispatch automatically routes to the correct @StrategyMapping method
+        Affiliate affiliate = dispatcher.dispatch(platformType, Affiliate.class, request);
 
         return ResponseEntity.ok(affiliate);
     }
