@@ -1,0 +1,68 @@
+#!/bin/bash
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+echo -e "${YELLOW}Running pre-push checks...${NC}"
+
+# Get the current branch
+current_branch=$(git symbolic-ref --short HEAD)
+
+# Prevent direct push to main/dev
+protected_branches="^(main|master|develop|dev)$"
+
+if echo "$current_branch" | grep -qE "$protected_branches"; then
+    echo -e "${RED}❌ Direct push to $current_branch is not allowed!${NC}"
+    echo -e "${YELLOW}Please create a feature branch and open a PR.${NC}"
+    echo ""
+    echo "To bypass this check (use with caution):"
+    echo "  git push --no-verify"
+    exit 1
+fi
+
+# Check if all commits follow conventional format
+echo -n "Checking commit messages on branch... "
+
+# Get commits not in origin/dev or origin/main
+commits=$(git log origin/dev..HEAD --pretty=format: "%s" 2>/dev/null)
+if [ -z "$commits" ]; then
+    commits=$(git log origin/main..HEAD --pretty=format:"%s" 2>/dev/null)
+fi
+
+invalid_commits=""
+while IFS= read -r commit_msg; do
+    if !  echo "$commit_msg" | grep -qE '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?: .+'; then
+        if !  echo "$commit_msg" | grep -qE '^Merge branch'; then
+            invalid_commits="${invalid_commits}\n  - $commit_msg"
+        fi
+    fi
+done <<< "$commits"
+
+if [ -n "$invalid_commits" ]; then
+    echo -e "${RED}✗${NC}"
+    echo -e "${RED}❌ Invalid commit messages found:${NC}"
+    echo -e "$invalid_commits"
+    echo ""
+    echo -e "${YELLOW}Fix with interactive rebase:${NC}"
+    echo "  git rebase -i origin/dev"
+    exit 1
+else
+    echo -e "${GREEN}✓${NC}"
+fi
+
+# Run tests (if available)
+if [ -f "package.json" ] && grep -q '"test"' package.json; then
+    echo -n "Running tests... "
+    if npm test &> /dev/null; then
+        echo -e "${GREEN}✓${NC}"
+    else
+        echo -e "${RED}✗${NC}"
+        echo -e "${RED}❌ Tests failed!  Fix tests before pushing.${NC}"
+        exit 1
+    fi
+fi
+
+echo -e "${GREEN}✅ All pre-push checks passed!${NC}"
+exit 0
