@@ -1,0 +1,52 @@
+#!/bin/bash
+
+commit_msg_file=$1
+commit_source=$2
+sha=$3
+
+# Only add template for regular commits (not merge, squash, etc.)
+if [ -z "$commit_source" ]; then
+    # Get current branch name
+    branch_name=$(git symbolic-ref --short HEAD 2>/dev/null)
+    
+    # Extract issue number from branch name (e.g., feature/123-add-login)
+    issue_number=$(echo "$branch_name" | grep -oE '[0-9]+' | head -n1)
+    
+    # Check if commit message is empty or template
+    if !  grep -qE '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)' "$commit_msg_file"; then
+        # Add template
+        cat > "$commit_msg_file" << EOF
+# type(scope): subject (max 50 chars)
+# |<----  Using a Maximum Of 50 Characters  ---->|
+
+# Example: feat(auth): add user login functionality
+
+# Body:  Explain what and why (not how). Wrap at 72 characters.
+# |<----   Try To Limit Each Line to a Maximum Of 72 Characters   ---->|
+
+# Footer: Reference issues and breaking changes
+# Examples: 
+#   Closes #${issue_number:-123}
+#   BREAKING CHANGE: description
+
+# Type must be one of: 
+#   feat:      A new feature
+#   fix:      A bug fix
+#   docs:     Documentation changes
+#   style:    Formatting, missing semicolons, etc (no code change)
+#   refactor: Code change that neither fixes a bug nor adds a feature
+#   perf:     Performance improvements
+#   test:     Adding or correcting tests
+#   build:    Changes to build system or dependencies
+#   ci:        Changes to CI configuration
+#   chore:    Other changes that don't modify src or test files
+#   revert:   Reverts a previous commit
+EOF
+    fi
+    
+    # If issue number found in branch, suggest it
+    if [ -n "$issue_number" ]; then
+        echo "" >> "$commit_msg_file"
+        echo "# Branch: $branch_name (Issue #$issue_number)" >> "$commit_msg_file"
+    fi
+fi
